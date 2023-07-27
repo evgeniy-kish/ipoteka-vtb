@@ -1,0 +1,19 @@
+{
+    "name": "evgeniy-kish/ipoteka-vtb",
+    "description": "api tools for ipoteka vtb",
+    "type": "library",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "EvgeniyKish\\IpotekaVtb\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Evgeniy Kish",
+            "email": "on.the.dolphin@yandex.ru"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {}
+}
