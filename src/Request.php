@@ -1,6 +1,6 @@
 <?php
 
-namespace inc\Bank;
+namespace EvgeniyKish\IpotekaVtb;
 
 class Request{
 
@@ -16,27 +16,29 @@ class Request{
 	protected $httpCode = null;
 
 
-	public function __construct(protected string $url = '', protected array $fields = [], protected array $header = [], protected string $typeRequest = 'POST'){
+	public function __construct(protected string $url = '', protected $fields = null, protected array $header = [], protected string $typeRequest = 'POST'){
 		$this->curl = curl_init();
 
-		curl_setopt_array($this->curl, array(
-			CURLOPT_URL => $this->url,
+		curl_setopt_array($this->curl, [
+			CURLOPT_URL => $url,
 			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_SSL_VERIFYPEER => false,
 			CURLOPT_ENCODING => '',
 			CURLOPT_MAXREDIRS => 10,
 			CURLOPT_TIMEOUT => 0,
-			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_FOLLOWLOCATION => false,
 			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST => $this->typeRequest,
-			CURLOPT_POSTFIELDS => json_encode($fields),
+			CURLOPT_CUSTOMREQUEST => $typeRequest,
+			CURLOPT_POSTFIELDS => $fields,
 			CURLOPT_HTTPHEADER => $this->header
-		));
+		]);
+
 	}
 
 	public function exec()
 	{
 		$res = curl_exec($this->curl);
-		$this->httpCode = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
+		$this->httpCode = curl_getinfo($this->curl, CURLINFO_HTTP_CODE );
 		curl_close($this->curl);
 		return $res;
 	}

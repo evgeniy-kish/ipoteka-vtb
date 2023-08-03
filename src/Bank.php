@@ -1,13 +1,14 @@
 <?php
 
 
-namespace inc\Bank;
+namespace EvgeniyKish\IpotekaVtb;
 
+use EvgeniyKish\IpotekaVtb\interfaceBank;
 
 class Bank implements interfaceBank
 {
 
-	protected string $token; 
+	protected string $token;
 
 	public function __construct(protected string $client_id = '', protected string $client_secret = ''){
 
@@ -16,6 +17,13 @@ class Bank implements interfaceBank
 	public function generationToken(Request $request): string{
 
 		return $request->exec();
+
+	}
+
+
+	public function getToken(){
+
+		return $token;
 
 	}
 
