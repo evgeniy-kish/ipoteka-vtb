@@ -19,17 +19,17 @@ class RequestFileBinary{
 	public function __construct(protected string $url = '', protected $file = null, protected array $header = [], protected string $typeRequest = 'POST'){
 		$this->curl = curl_init();
 
-	    curl_setopt_array($this->curl, [
-		    CURLOPT_URL => $url,
-		    CURLOPT_PUT => true,
-		    CURLOPT_CUSTOMREQUEST => $typeRequest,
-		    CURLOPT_INFILESIZE => $file['size'],
-		    CURLOPT_INFILE => $file['binary'],
-		    CURLOPT_RETURNTRANSFER => true,
-		    CURLOPT_SSL_VERIFYPEER => false,
-		    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-		    CURLOPT_HTTPHEADER => $header,
-	    ]);
+		curl_setopt_array($this->curl, [
+			CURLOPT_URL => $url,
+			CURLOPT_PUT => true,
+			CURLOPT_CUSTOMREQUEST => $typeRequest,
+			CURLOPT_INFILESIZE => $file['size'],
+			CURLOPT_INFILE => $file['binary'],
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_SSL_VERIFYPEER => false,
+			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			CURLOPT_HTTPHEADER => $header,
+		]);
 	}
 
 	public function exec()

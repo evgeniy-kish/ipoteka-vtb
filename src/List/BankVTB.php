@@ -2,6 +2,7 @@
 
 namespace EvgeniyKish\IpotekaVtb\list;
 
+use app\models\FilesData;
 use EvgeniyKish\IpotekaVtb\Bank;
 use EvgeniyKish\IpotekaVtb\Request;
 use EvgeniyKish\IpotekaVtb\RequestFileBinary;
@@ -11,7 +12,7 @@ class BankVTB extends Bank
 
 	private string $urlToken = 'https://epa-ift.vtb.ru:443/passport/oauth2/token';
 	private string $urlOpenApi = 'https://test.api.vtb.ru:8443/';
-	private string $partnerOrgId = '';
+	private string $partnerOrgId = 'fdab0f15-3421-404f-8367-6c093b109ae4';
 	private array $field;
 	public array $errors = [];
 	public array $request = [];
@@ -27,7 +28,6 @@ class BankVTB extends Bank
 
 		$this->questionnaireId = md5(time());
 
-
 		$this->field = [
 			'grant_type' => 'client_credentials',
 			'client_id' => $client_id.'%40ext.vtb.ru',
@@ -38,6 +38,7 @@ class BankVTB extends Bank
 
 	// Create Token
 	public function getToken(){
+
 		$field = urldecode(http_build_query($this->field, '', '&'));
 		$this->token = $this->generationToken(new Request($this->urlToken, $field, ['Content-Type: application/x-www-form-urlencoded', 'Cookie: amlbcookie=01']));
 		return json_decode($this->token, JSON_OBJECT_AS_ARRAY)['access_token'] ?? '';
@@ -45,22 +46,27 @@ class BankVTB extends Bank
 	}
 
 	// Create simple order
-	public function createOrUpdateQuestionnaires($questionnaireId = null){
+	public function createOrUpdateQuestionnaires($questionnaireId = null, $info){
 
-		$this->questionnaireId = $questionnaireId ?? $this->questionnaireId;
+		$this->questionnaireId = $questionnaireId ?? md5(time());
+
 
 		$url = $this->urlOpenApi.'openapi/rb/IPO/partnerAPI/v1/'.$this->partnerOrgId.'/questionnaires/'.$this->questionnaireId;
 
+		$info['phone'] = preg_replace('/[^0-9]/', '', $info['phone']);
+
+		$phone = substr($info['phone'],1);
+
 		$fields = [
-			"clientEmail" => "on.the",
-			"clientFirstName" => "Дмитрий",
-			"clientLastName" => "Высочин",
-			"clientMiddleNames" => "Высочин",
-			"clientPhone" => "9001238551",
+			"clientEmail" => $info['email'],
+			"clientFirstName" => explode(' ', $info['name'])[0],
+			"clientLastName" => explode(' ', $info['name'])[1],
+			"clientMiddleNames" => explode(' ', $info['name'])[2],
+			"clientPhone" => $phone,
 			"productGroupId" => "cm.LoanProductGroup.BuyingProperty",
 			"requestType" => "tsc.RequestType.Lead",
-			"requestedAmount" => 500000,
-			"comment" => 'тестовая заявка на клиента',
+			"requestedAmount" => $info['credit'],
+			"comment" => $info['comment'] ?? '',
 			"supportingData" => [
 				"masterCikId" => "003"
 			],
@@ -162,7 +168,9 @@ class BankVTB extends Bank
 
 		if ($request->info() == 200){
 			return $this->questionnaireId;
-		}else return json_decode($request->exec(), JSON_OBJECT_AS_ARRAY);
+		} else {
+			return json_decode($request->exec(), JSON_OBJECT_AS_ARRAY);
+		};
 
 	}
 
@@ -174,8 +182,6 @@ class BankVTB extends Bank
 		$this->attachmentId = $attachmentId;
 
 		$url = $this->urlOpenApi.'openapi/cross/fsrv/v1/transfer_rq';
-
-
 
 		$fields = [
 			"processCode" => 19,
@@ -208,6 +214,8 @@ class BankVTB extends Bank
 				if ($this->transferFileСonfim()){
 					$this->transferFileAttachments();
 				}
+			} else {
+				var_dump($this->transferFileBinary($file));
 			}
 
 
@@ -216,6 +224,7 @@ class BankVTB extends Bank
 		}else{
 			$this->errors['transferFile'][] = $result;
 		}
+
 
 		return json_encode($this->errors);
 
@@ -267,9 +276,8 @@ class BankVTB extends Bank
 
 		$result = json_decode($request->exec(), JSON_OBJECT_AS_ARRAY);
 
-		$this->request['transferFileСonfim']['request'][$this->count] = $request;
-		$this->request['transferFileСonfim']['result'][$this->count] = $result;
-
+		$this->request['transferFileConfim']['request'][$this->count] = $request;
+		$this->request['transferFileConfim']['result'][$this->count] = $result;
 		if ($request->info() == 201){
 			return true;
 		}else{
@@ -309,7 +317,10 @@ class BankVTB extends Bank
 	}
 
 	// Отправить заявку ЛКП в работу
-	public function questionnairesSubmit(){
+	public function questionnairesSubmit($questionnaireId){
+
+		$this->questionnaireId = $questionnaireId;
+
 		$url = $this->urlOpenApi.'openapi/rb/IPO/partnerAPI/v1/'.$this->partnerOrgId.'/questionnaires/'.$this->questionnaireId.'/submit';
 
 		$header = [
@@ -320,8 +331,6 @@ class BankVTB extends Bank
 			'Accept-Encoding: deflate, br'
 		];
 
-
-
 		$request = new Request($url, '{}', $header, 'POST');
 
 		$result = json_decode($request->exec(), JSON_OBJECT_AS_ARRAY);
@@ -330,7 +339,7 @@ class BankVTB extends Bank
 		$this->request['questionnairesSubmit']['result'][0] = $result;
 
 		if ($request->info() == 200){
-			return $result;
+			return json_encode($result);
 		}else{
 			$this->errors[] = $result;
 			return false;
@@ -355,6 +364,62 @@ class BankVTB extends Bank
 
 		$result = json_decode($request->exec(), JSON_OBJECT_AS_ARRAY);
 
+		$attach = [];
+		$status = '';
+		$statusFile = '';
+
+		if (isset($result['value']['attachments']) && $result['value']['attachments']){
+			foreach ($result['value']['attachments'] as $attachments){
+
+				if (isset($attachments['status'])){
+					switch ($attachments['status']){
+						case 'ERROR' : $statusFile = 'Файл не прошел проверку'; break;
+						case 'PROCESS' : $statusFile = 'Файл в обработки'; break;
+						case 'SUCCESS' : $statusFile = 'Файл прикреплен к заявке';  break;
+					}
+				}
+
+				$attach[] = [
+					'acceptanceResult' => $statusFile,
+					'status' => $attachments['status'],
+					'id' => $attachments['id'],
+				];
+
+
+
+//				if ($attachments['acceptanceResult'] != 'Success'){
+//
+//					$file = FilesData::find()->where(['id' => $attachments['id']])->one();
+//
+//					$attach[] = [
+//						'acceptanceResult' => $attachments['acceptanceResult'],
+//						'file' => $file->comment,
+//						'id' => $attachments['id'],
+//					];
+//				}
+			}
+		}
+
+		if (isset($result['value']['stateId'])){
+
+			switch ($result['value']['stateId']){
+				case 'cm.LoanApplicationStatus.DecisionProcessing': $status = 'Заявка на рассмотрении'; break;
+				case 'cm.LoanApplicationStatus.Approved': $status = 'Кредит одобрен'; break;
+				case 'tsc.AppStatus.ObjectInProgress': $status = 'Документы на рассмотрении'; break;
+				case 'tsc.AppStatus.ObjectApproved': $status = 'Согласование сделки и подготовка документации'; break;
+				case 'cm.LoanApplicationStatus.Issued': $status = 'Кредит выдан'; break;
+				case 'tsc.AppStatus.ReworkClient': $status = 'Причина возврата на доработку указана в комментариях'; break;
+				case 'tsc.AppStatus.ReworkObject': $status = 'Причина возврата на доработку указана в комментариях'; break;
+				case 'cm.LoanApplicationStatus.ApplicationFilling': $status = 'Черновик'; break;
+				default: $status = $result['value']['stateId'];
+			}
+		}
+
+
+		$result['value']['attachments'] = $attach;
+		$result['value']['stateSlug'] = $result['value']['stateId'] ?? '-';
+		$result['value']['stateId'] = $status;
+
 		return $result;
 	}
 
@@ -373,7 +438,7 @@ class BankVTB extends Bank
 
 		$result = json_decode($request->exec());
 
-		return $result;
+		return json_encode($result);
 	}
 
 
